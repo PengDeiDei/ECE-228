@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from network_utils import build_mlp, device, np2torch
 
-
 class BaselineNetwork(nn.Module):
     """
     Class for implementing Baseline network
@@ -24,7 +23,11 @@ class BaselineNetwork(nn.Module):
 
         #######################################################
         #########   YOUR CODE HERE - 2-8 lines.   #############
-
+        input_ = self.env.observation_space.shape[0]
+        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")        
+        output_ = 1
+        self.network = build_mlp(input_,output_,config.n_layers,config.layer_size).to(device)
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=self.lr)
         #######################################################
         #########          END YOUR CODE.          ############
 
@@ -48,7 +51,7 @@ class BaselineNetwork(nn.Module):
         """
         #######################################################
         #########   YOUR CODE HERE - 1 lines.     #############
-
+        output = self.network(observations).flatten()
         #######################################################
         #########          END YOUR CODE.          ############
         assert output.ndim == 1
@@ -76,7 +79,7 @@ class BaselineNetwork(nn.Module):
         observations = np2torch(observations)
         #######################################################
         #########   YOUR CODE HERE - 1-4 lines.   ############
-
+        advantages = (np2torch(returns) - self.forward(observations)).detach().cpu().data.numpy()
         #######################################################
         #########          END YOUR CODE.          ############
         return advantages
@@ -99,6 +102,12 @@ class BaselineNetwork(nn.Module):
         observations = np2torch(observations)
         #######################################################
         #########   YOUR CODE HERE - 4-10 lines.  #############
+        output = self.forward(observations)
+        self.optimizer.zero_grad()
+        MSE = nn.MSELoss()
+        loss = MSE(returns.flatten(),output)
+        loss.backward()
+        self.optimizer.step()
 
         #######################################################
         #########          END YOUR CODE.          ############
