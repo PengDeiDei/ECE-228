@@ -1,3 +1,5 @@
+from importlib.metadata import distribution
+from locale import normalize
 import numpy as np
 import torch
 import gym
@@ -6,7 +8,7 @@ from general import get_logger, Progbar, export_plot
 from baseline_network import BaselineNetwork
 from network_utils import build_mlp, device, np2torch
 from policy import CategoricalPolicy, GaussianPolicy
-
+import copy
 
 class PolicyGradient(object):
     """
@@ -69,7 +71,13 @@ class PolicyGradient(object):
         """
         #######################################################
         #########   YOUR CODE HERE - 8-12 lines.   ############
-
+        self.network = build_mlp(self.observation_dim, self.action_dim, self.config.n_layers, self.config.layer_size).to(device)
+        if self.discrete == True:
+            self.policy = CategoricalPolicy(self.network).to(device)
+        else:
+            self.policy = GaussianPolicy(self.network,self.action_dim).to(device)
+        
+        self.optimizaer = torch.optim.Adam(self.policy.parameters(), lr=self.lr)
         #######################################################
         #########          END YOUR CODE.          ############
 
@@ -185,7 +193,11 @@ class PolicyGradient(object):
             rewards = path["reward"]
             #######################################################
             #########   YOUR CODE HERE - 5-10 lines.   ############
-
+            returns = copy.copy(rewards)
+            for idx, reward in enumerate(reversed(rewards)):
+                index = len(rewards) - idx - 1
+                if idx != 0:
+                    returns[index] = reward + self.config.gamma*returns[index + 1]
             #######################################################
             #########          END YOUR CODE.          ############
             all_returns.append(returns)
@@ -210,7 +222,7 @@ class PolicyGradient(object):
         """
         #######################################################
         #########   YOUR CODE HERE - 1-2 lines.    ############
-
+        normalized_advantages = (advantages - advantages.mean())/advantages.std()
         #######################################################
         #########          END YOUR CODE.          ############
         return normalized_advantages
@@ -261,7 +273,13 @@ class PolicyGradient(object):
         advantages = np2torch(advantages)
         #######################################################
         #########   YOUR CODE HERE - 5-7 lines.    ############
-
+        distribution = self.policy.action_distribution(observations)
+        probs = -1*distribution.log_prob(actions)
+        loss = torch.matmul(probs,advantages)
+        
+        self.optimizaer.zero_grad()
+        loss.backward()
+        self.optimizaer.step()
         #######################################################
         #########          END YOUR CODE.          ############
 
