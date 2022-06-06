@@ -1,3 +1,4 @@
+from importlib.metadata import distribution
 import torch
 import torch.nn as nn
 import torch.distributions as ptd
@@ -39,7 +40,7 @@ class BasePolicy:
         observations = np2torch(observations)
         #######################################################
         #########   YOUR CODE HERE - 1-3 lines.    ############
-
+        sampled_actions = self.action_distribution(observations).sample().cpu().data.numpy()
         #######################################################
         #########          END YOUR CODE.          ############
         return sampled_actions
@@ -49,7 +50,8 @@ class CategoricalPolicy(BasePolicy, nn.Module):
     def __init__(self, network):
         nn.Module.__init__(self)
         self.network = network
-
+        self.network.to(device)
+ 
     def action_distribution(self, observations):
         """
         Args:
@@ -62,7 +64,7 @@ class CategoricalPolicy(BasePolicy, nn.Module):
         """
         #######################################################
         #########   YOUR CODE HERE - 1-2 lines.    ############
-
+        distribution = ptd.categorical.Categorical(logits=self.network(observations))
         #######################################################
         #########          END YOUR CODE.          ############
         return distribution
@@ -77,10 +79,12 @@ class GaussianPolicy(BasePolicy, nn.Module):
         initial std of 1), but you are welcome to try different values.
         """
         nn.Module.__init__(self)
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.network = network
+        self.network.to(device)
         #######################################################
         #########   YOUR CODE HERE - 1 line.       ############
-
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
         #######################################################
         #########          END YOUR CODE.          ############
 
@@ -94,7 +98,7 @@ class GaussianPolicy(BasePolicy, nn.Module):
         """
         #######################################################
         #########   YOUR CODE HERE - 1 line.       ############
-
+        std = torch.exp(self.log_std)
         #######################################################
         #########          END YOUR CODE.          ############
         return std
@@ -118,7 +122,8 @@ class GaussianPolicy(BasePolicy, nn.Module):
         """
         #######################################################
         #########   YOUR CODE HERE - 2-4 lines.    ############
-
+        mean = self.network(observations)
+        distribution = ptd.multivariate_normal.MultivariateNormal(mean,scale_tril=torch.diag(self.std()))
         #######################################################
         #########          END YOUR CODE.          ############
         return distribution
